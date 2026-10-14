@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/happyhands2323-dev/itdo#readme",
   "dependencies": {
+    "better-auth": "^1.7.7",
     "body-parser": "^2.3.0",
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
