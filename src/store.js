@@ -1,32 +1,40 @@
-const { randomUUID } = require("node:crypto");
+const { eq, desc } = require("drizzle-orm");
+const { db } = require("./db");
+const { items } = require("./db/schema");
 
-const items = new Map();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isValidId = (id) => typeof id === "string" && UUID_RE.test(id);
 
-function list() {
-  return Array.from(items.values());
+async function list({ done } = {}) {
+  const query = db.select().from(items).orderBy(desc(items.createdAt));
+  return typeof done === "boolean" ? query.where(eq(items.done, done)) : query;
 }
 
-function get(id) {
-  return items.get(id) ?? null;
+async function get(id) {
+  if (!isValidId(id)) return null;
+  const [item] = await db.select().from(items).where(eq(items.id, id));
+  return item ?? null;
 }
 
-function create({ title, description = "", done = false }) {
-  const now = new Date().toISOString();
-  const item = { id: randomUUID(), title, description, done, createdAt: now, updatedAt: now };
-  items.set(item.id, item);
+async function create({ title, description = "", done = false }) {
+  const [item] = await db.insert(items).values({ title, description, done }).returning();
   return item;
 }
 
-function update(id, changes) {
-  const existing = items.get(id);
-  if (!existing) return null;
-  const updated = { ...existing, ...changes, id, updatedAt: new Date().toISOString() };
-  items.set(id, updated);
-  return updated;
+async function update(id, changes) {
+  if (!isValidId(id)) return null;
+  const [item] = await db
+    .update(items)
+    .set({ ...changes, updatedAt: new Date() })
+    .where(eq(items.id, id))
+    .returning();
+  return item ?? null;
 }
 
-function remove(id) {
-  return items.delete(id);
+async function remove(id) {
+  if (!isValidId(id)) return false;
+  const deleted = await db.delete(items).where(eq(items.id, id)).returning({ id: items.id });
+  return deleted.length > 0;
 }
 
 module.exports = { list, get, create, update, remove };

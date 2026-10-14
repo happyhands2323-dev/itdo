@@ -41,43 +41,44 @@ function validate(body, { partial }) {
   return { data };
 }
 
-router.get("/", (req, res) => {
-  let items = store.list();
-  if (req.query.done === "true" || req.query.done === "false") {
-    const done = req.query.done === "true";
-    items = items.filter((item) => item.done === done);
-  }
+router.get("/", async (req, res) => {
+  const done =
+    req.query.done === "true" ? true : req.query.done === "false" ? false : undefined;
+  const items = await store.list({ done });
   res.json({ data: items, count: items.length });
 });
 
-router.get("/:id", (req, res) => {
-  const item = store.get(req.params.id);
+router.get("/:id", async (req, res) => {
+  const item = await store.get(req.params.id);
   if (!item) return res.status(404).json({ error: "Item not found" });
   res.json({ data: item });
 });
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const { data, error } = validate(req.body, { partial: false });
   if (error) return res.status(400).json({ error });
-  const item = store.create(data);
+  const item = await store.create(data);
   res.status(201).location(`${req.baseUrl}/${item.id}`).json({ data: item });
 });
 
 function handleUpdate(partial) {
-  return (req, res) => {
-    if (!store.get(req.params.id)) return res.status(404).json({ error: "Item not found" });
+  return async (req, res) => {
     const { data, error } = validate(req.body, { partial });
     if (error) return res.status(400).json({ error });
     const changes = partial ? data : { description: "", done: false, ...data };
-    res.json({ data: store.update(req.params.id, changes) });
+    const item = await store.update(req.params.id, changes);
+    if (!item) return res.status(404).json({ error: "Item not found" });
+    res.json({ data: item });
   };
 }
 
 router.put("/:id", handleUpdate(false));
 router.patch("/:id", handleUpdate(true));
 
-router.delete("/:id", (req, res) => {
-  if (!store.remove(req.params.id)) return res.status(404).json({ error: "Item not found" });
+router.delete("/:id", async (req, res) => {
+  if (!(await store.remove(req.params.id))) {
+    return res.status(404).json({ error: "Item not found" });
+  }
   res.status(204).end();
 });
 
